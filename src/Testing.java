@@ -7,39 +7,96 @@ import java.util.Scanner;
 public class Testing extends Inverted
 {
 	public static void main(String args[]) throws FileNotFoundException, UnsupportedEncodingException
-    {
+	{
 		File f = new File("PostingList.txt");
-		Scanner sc = new Scanner(f);
 		String term = null;
-		
-		System.out.println("Hello, type 'r' to build the dictionary and posting list.");
+		boolean stopWords = true;
+		boolean stem = true;
+		boolean searching = true;
+		int searchCount = 0;
+		double totalSearchTime = 0;
+
 		Inverted test = new Inverted();
 		Scanner in = new Scanner(System.in);
+
+		System.out.println("Would you like stop words? y/n");
 		String nextLine = in.nextLine();
-		if(nextLine.equals("Quit")){
-			//
-		}else if(nextLine.equals("r")){
-			test.run();
+		if (nextLine.equals("y"))
+		{
+			stopWords = true;
+		}
+		else if (nextLine.equals("n"))
+		{
+			stopWords = false;
+		}
+
+		System.out.println("Would you like stemming? y/n");
+		nextLine = in.nextLine();
+		if (nextLine.equals("y"))
+		{
+			stem = true;
+		}
+		else if (nextLine.equals("n"))
+		{
+			stem = false;
+		}
+
+		System.out.println("Hello, type 'b' to build the dictionary and posting list.");
+		nextLine = in.nextLine();
+		if (nextLine.equals("b"))
+		{
+			test.run(stopWords, stem);
 			System.out.println("The libaries have been built");
 		}
+		while (searching)
+		{
 			System.out.println("Now type a keyword you would like to search");
 			nextLine = in.nextLine();
-			term = myStem(nextLine);
+			double startTime = System.nanoTime();
+			searchCount++;
+
+			Scanner sc = new Scanner(f);
+			if (stem)
+			{
+				term = myStem(nextLine);
+			}
+			else
+			{
+				term = nextLine;
+			}
+
 			System.out.println(term);
 			String currLine = null;
-			while(sc.hasNextLine()){
+			while (sc.hasNextLine())
+			{
 				currLine = sc.nextLine();
 				nextLine = sc.nextLine();
-				if(currLine.substring(6).equals(term)){
+				if (currLine.substring(6).equals(term))
+				{
 					nextLine = nextLine.substring(25);
-					//System.out.println(nextLine.substring(0, nextLine.indexOf(".")));
-					//System.out.println(nextLine);
 					ArrayList<Integer> id = docID(nextLine);
 					nextID(id, term);
+				}
 			}
+			double endTime = System.nanoTime();
+			double duration = (endTime - startTime);
+			totalSearchTime = totalSearchTime + duration;
+			System.out.println(duration / 1000000000 + " Term Search Time ");
+			System.out.println("Would you like to search another term? y/n");
+			nextLine = in.nextLine();
+			if (nextLine.equals("y"))
+			{
+				searching = true;
+			}
+			else
+				searching = false;
+
+			sc.close();
 		}
-			in.close();
-    }
+		in.close();
+		System.out.println("Average Search Time = " + totalSearchTime / searchCount / 1000000000);
+
+	}
 
 	public static String myStem(String term)
 	{
@@ -73,6 +130,8 @@ public class Testing extends Inverted
 
 	}
 
+	// Gets the ID array and goes through cacm.all printing out the correspoding
+	// lines.
 	public static void nextID(ArrayList<Integer> id, String term) throws FileNotFoundException
 	{
 		File f = new File("cacm.all");
@@ -80,7 +139,6 @@ public class Testing extends Inverted
 		int currID = 0;
 		Scanner sc = new Scanner(f);
 		boolean v = false;
-		double startTime = System.nanoTime();
 		int idSize = id.size();
 		int runSize = 0;
 		if (idSize == 1)
@@ -124,9 +182,7 @@ public class Testing extends Inverted
 				}
 			}
 		}
-		double endTime = System.nanoTime();
-		double duration = (endTime - startTime);
-		System.out.println(duration / 1000000000 + " Term Search Time ");
+
 		sc.close();
 	}
 }

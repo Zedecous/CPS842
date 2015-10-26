@@ -1,7 +1,5 @@
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
@@ -11,29 +9,56 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
 
+//First Scan the CACM.ALL File
+//Then Run REGEX or any other options you want onto the scanned file.
 public class Inverted
 {
-	public void run() throws FileNotFoundException, UnsupportedEncodingException
+	// Defining Variables that will be used later in the program
+	public HashMap<String, Integer> dictionary = new HashMap<String, Integer>();
+	public ArrayList<String> withSpace = new ArrayList<String>();
+	public ArrayList<String> docID = new ArrayList<String>();
+	public File f = new File("cacm.all");
+
+	public void run(boolean stopWords, boolean stem) throws FileNotFoundException, UnsupportedEncodingException
 	{
-		// Defining Variables that will be used later in the program
-		HashMap<String, Integer> dictionary = new HashMap<String, Integer>();
-		ArrayList<String> withSpace = new ArrayList<String>();
-		ArrayList<String> docID = new ArrayList<String>();
 		PrintWriter writer = new PrintWriter("sortedDictionary.txt", "UTF-8");
 		PrintWriter postList = new PrintWriter("postingList.txt", "UTF-8");
-		File f = new File("cacm.all");
+
+		// Stemming and REGEX done below as well as toLower
+		scanCACM();
+		withSpace = toLower(withSpace);
+		if (stopWords)
+			withSpace = regex(withSpace);
+		if (stem)
+			withSpace = myStem(withSpace);
+		// printList(docID);
+		dictionary = countWords(withSpace, dictionary);
+		sortMap(dictionary, writer);
+		// Posting List construction begins here
+		// Returns the docID, POS, and string occurrences
+
+		parseLine(docID, postList, stopWords, stem);
+
+		// File closing
+		writer.close();
+		postList.close();
+
+	}
+
+	public void scanCACM() throws FileNotFoundException
+	{
 		String currLine, fullString = null;
 		currLine = null;
 		boolean check;
 		check = false;
 		Scanner sc = new Scanner(f);
 		Stemmer stem = new Stemmer();
-		
+
 		// Parsing through the file
 		// for (int i = 0; i <= 500; i++)
 		while (sc.hasNextLine())
 		{
-			
+
 			stem.stem();
 			if (check == false)
 				currLine = sc.nextLine();
@@ -108,117 +133,20 @@ public class Inverted
 		sc.close();
 		System.out.println("Finished parsing CACM.ALL");
 		docID = toLower(docID);
-		//docID = myStem(docID);
-		// docID = regex(docID);
-		withSpace = toLower(withSpace);
-		withSpace = regex(withSpace);
-		withSpace = myStem(withSpace);
-		//printList(docID);
-		dictionary = countWords(withSpace, dictionary);
-		sortMap(dictionary, writer);
-		// Posting List construction begins here
-		// Builds the initial hashmap values
-		// Returns the docID, POS, and string occurences
-
-		parseLine(docID, postList);
-
-		// File closing
-		writer.close();
-		postList.close();
-
 	}
 
-	public void rebuild(int id) throws FileNotFoundException, UnsupportedEncodingException
+	public static ArrayList<String> myStem(ArrayList<String> word)
 	{
-
-		ArrayList<String> docID = new ArrayList<String>();
-		File f = new File("cacm.all");
-		String currLine, fullString = null;
-		currLine = null;
-		boolean check;
-		check = false;
-		Scanner sc = new Scanner(f);
-		while (sc.hasNextLine())
-		{
-
-			if (check == false)
-				currLine = sc.nextLine();
-			check = false;
-			if (currLine.substring(0, 2).equals(".I"))
-			{
-				if (fullString != null)
-					docID = addStrings(docID, fullString);
-				fullString = currLine + " ";
-			}
-			else if (currLine.substring(0, 2).equals(".T"))
-			{
-				currLine = sc.nextLine();
-				while (!currLine.substring(0, 1).equals("."))
-				{
-					fullString = fullString.concat(currLine);
-					currLine = sc.nextLine();
-					check = true;
-				}
-			}
-			else if (currLine.substring(0, 2).equals(".B"))
-			{
-				fullString = fullString.concat(currLine);
-				currLine = sc.nextLine();
-				while (!currLine.substring(0, 1).equals("."))
-				{
-					// System.out.println("3");
-					fullString = fullString.concat(currLine);
-					currLine = sc.nextLine();
-					check = true;
-				}
-			}
-			else if (currLine.substring(0, 2).equals(".A"))
-			{
-				fullString = fullString.concat(currLine);
-				currLine = sc.nextLine();
-				while (!currLine.substring(0, 1).equals("."))
-				{
-					// System.out.println("4");
-					fullString = fullString.concat(currLine);
-					currLine = sc.nextLine();
-					check = true;
-				}
-			}
-
-			else if (currLine.substring(0, 2).equals(".W"))
-			{
-
-				fullString = fullString.concat(currLine);
-				currLine = sc.nextLine();
-				while (!currLine.substring(0, 1).equals(".") && sc.hasNextLine())
-				{
-					fullString = fullString.trim() + currLine.trim();
-					currLine = sc.nextLine();
-					check = true;
-
-				}
-			}
-		}
-		if (fullString != null)
-			docID = addStrings(docID, fullString);
-
-		sc.close();
-		
-		
-		search(id, docID);
-
-		//
-		
-	}
-	public static ArrayList<String> myStem(ArrayList<String> word){
 		Stemmer stem = new Stemmer();
 		ArrayList<String> stemmed = new ArrayList<String>();
 		String thisWord = null;
 		char[] wordArr = null;
-		for(int i = 0; i < word.size(); i++){
+		for (int i = 0; i < word.size(); i++)
+		{
 			thisWord = word.get(i);
 			wordArr = thisWord.toCharArray();
-			for(int j = 0; j < wordArr.length; j++){
+			for (int j = 0; j < wordArr.length; j++)
+			{
 				stem.add(wordArr[j]);
 			}
 			stem.stem();
@@ -227,46 +155,25 @@ public class Inverted
 		}
 		return stemmed;
 	}
-	public static String myStemStr(String word){
+
+	public static String myStemStr(String word)
+	{
 		Stemmer stem = new Stemmer();
 		String stemmed = null;
 		String thisWord = null;
 		char[] wordArr = word.toCharArray();
-		for(int i = 0; i < wordArr.length; i++){
+		for (int i = 0; i < wordArr.length; i++)
+		{
 			stem.add(wordArr[i]);
 		}
 		stem.stem();
 		thisWord = stem.toString();
 		stemmed = thisWord;
-		
+
 		return stemmed;
 	}
-	
-	private void search(int id, ArrayList<String> docID)
-	{
-		for(int i = 0; i < docID.size(); i++){
-			int j = 0;
-			String temp = docID.get(i);
-			int num = 0;
-			while (!Character.isDigit(temp.charAt(j)))
-			{
-				j++;
-			}
-			int h = j;
-			while (Character.isDigit(temp.charAt(h)))
-			{
-				h++;
-			}
-			num = Integer.parseInt(temp.substring(j, h));
-				if(id == num){
-					System.out.println(temp);
-			}
-		}
-	}
 
-	// Parses through the sentences separating the words and producing their
-	// DOCID and POS
-	public static void parseLine(ArrayList<String> words, PrintWriter file)
+	public static void parseLine(ArrayList<String> words, PrintWriter file, boolean stopWords, boolean stem)
 	{
 		Multimap<String, String> multimapOG = ArrayListMultimap.create();
 		Set<String> keys = multimapOG.keySet();
@@ -288,20 +195,30 @@ public class Inverted
 			num = Integer.parseInt(temp.substring(j, h));
 			temp = temp.substring(h + 1, temp.length());
 			String[] arr = temp.replaceAll("[^a-z]", "  ").split("\\s+");
-			ArrayList<String> countTotal = Lists.newArrayList(arr);;
-			countTotal = myStem(countTotal);
-			Multiset<String> weirdCount = HashMultiset.create(countTotal);
-			for (String ss : arr)
+			ArrayList<String> countTotal = Lists.newArrayList(arr);
+			if (stem)
 			{
-				ss = myStemStr(ss);
-				int count = weirdCount.count(ss);
-				if (ss.length() > 2 && isStopWord(ss))
-					//System.out.println(ss + " " + num + " ");
-					// temp.indexOf(ss));
-					multimapOG.put(ss, num + "." + temp.indexOf(ss) + ":" + count);
+				countTotal = myStem(countTotal);
 			}
-
-			// System.out.println(temp + " " + num);
+			String[] newArr = countTotal.toArray(new String[countTotal.size()]);
+			Multiset<String> weirdCount = HashMultiset.create(countTotal);
+			if (stopWords)
+			{
+				for (String ss : newArr)
+				{
+					int count = weirdCount.count(ss);
+					if (ss.length() > 2 && isStopWord(ss))
+						multimapOG.put(ss, num + "." + temp.indexOf(ss) + ":" + count);
+				}
+			}
+			else
+			{
+				for (String ss : newArr)
+				{
+					int count = weirdCount.count(ss);
+					multimapOG.put(ss, num + "." + temp.indexOf(ss) + ":" + count);
+				}
+			}
 		}
 		for (String key : keys)
 		{
@@ -313,7 +230,6 @@ public class Inverted
 		System.out.println("Finished Building Posting List");
 	}
 
-	
 	// lowercases it all
 	public static ArrayList<String> toLower(ArrayList<String> list)
 	{
@@ -323,11 +239,15 @@ public class Inverted
 		}
 		return list;
 	}
-	public static void printArray(String[] arr){
-		for(int i = 0; i < arr.length; i++){
+
+	public static void printArray(String[] arr)
+	{
+		for (int i = 0; i < arr.length; i++)
+		{
 			System.out.println(arr[i]);
 		}
 	}
+
 	// regex to reduce word count and stop words
 	public static ArrayList<String> regex(ArrayList<String> list)
 	{
@@ -385,14 +305,12 @@ public class Inverted
 	// Counts the words for the dictionary
 	public static HashMap<String, Integer> countWords(ArrayList<String> list, HashMap<String, Integer> count)
 	{
-		int j = 0;
 		for (int i = 0; i < list.size(); i++)
 		{
 			Integer f = count.get(list.get(i));
 			if (f == null)
 			{
 				count.put(list.get(i), 1);
-				j++;
 			}
 			else
 			{
@@ -409,8 +327,8 @@ public class Inverted
 	{
 
 		Map<String, Integer> map = new TreeMap<String, Integer>(unsorted);
-		Set set2 = map.entrySet();
-		Iterator iterator2 = set2.iterator();
+		Set<?> set2 = map.entrySet();
+		Iterator<?> iterator2 = set2.iterator();
 		while (iterator2.hasNext())
 		{
 			Map.Entry me2 = (Map.Entry) iterator2.next();
